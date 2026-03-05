@@ -32,7 +32,10 @@ header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; 
     
     <!-- RIGHT PANEL -->
     <div id="sidebar">
-      <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS (cash + metrics)</div>
+      <div class="text-[#00e5ff] text-xs tracking-widest mb-3">// GLOBAL METRICS</div>
+      <div id="global-metrics" class="mb-6 text-xs bg-[#11151f] p-3 rounded border border-[#1e2d3d]"></div>
+      
+      <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS</div>
       <div id="agent-list"></div>
     </div>
   </div>
@@ -48,6 +51,7 @@ let agents = [];
 let tick = 0;
 let running = true;
 let logs = [];
+let totalFoodConsumed = 0;
 
 // CREATE AGENT
 function createAgent(i) {
@@ -74,6 +78,15 @@ function addLog(msg) {
 }
 
 function updateSidebar() {
+  const totalFoodAvailable = agents.reduce((sum, a) => sum + (a.dead ? 0 : a.food), 0);
+  
+  document.getElementById('global-metrics').innerHTML = `
+    <div class="grid grid-cols-2 gap-3 text-xs">
+      <div>FOOD CONSUMED</div><div class="text-emerald-400 font-bold">${totalFoodConsumed}</div>
+      <div>FOOD AVAILABLE</div><div class="text-amber-300 font-bold">${totalFoodAvailable}</div>
+    </div>
+  `;
+
   let html = '';
   agents.forEach(a => {
     const status = a.dead ? '<span class="text-red-400">DEAD</span>' : '';
@@ -96,7 +109,6 @@ function draw() {
   agents.forEach(a => {
     if (a.dead) return;
 
-    // visibility circle
     ctx.beginPath();
     ctx.arc(a.x, a.y, a.visibility, 0, Math.PI*2);
     ctx.strokeStyle = 'rgba(0,229,255,0.13)';
@@ -105,7 +117,6 @@ function draw() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // agent
     ctx.fillStyle = a.color + '44';
     ctx.fillRect(a.x-8, a.y-8, 16, 16);
     ctx.strokeStyle = a.color;
@@ -127,7 +138,6 @@ function step() {
     const a = agents[i];
     if (a.dead) continue;
 
-    // wander
     a.vx += (Math.random()-0.5)*0.65;
     a.vy += (Math.random()-0.5)*0.65;
     const spd = Math.hypot(a.vx, a.vy);
@@ -138,9 +148,14 @@ function step() {
     if (a.x < 30 || a.x > 910) a.vx *= -0.88;
     if (a.y < 30 || a.y > 670) a.vy *= -0.88;
 
-    // hunger drain
-    if (tick % 10 === 0) {
-      a.hunger = Math.max(0, a.hunger - 1);
+    if (tick % 10 === 0) a.hunger = Math.max(0, a.hunger - 1);
+
+    // SELF CONSUMPTION — eat own food when hungry
+    if (tick % 12 === 0 && a.food > 0) {
+      a.food -= 1;
+      a.hunger = Math.min(100, a.hunger + 28);
+      totalFoodConsumed++;
+      addLog(`${a.name} ate 1 own FOOD`);
     }
 
     // DEATH CHECK
@@ -150,11 +165,10 @@ function step() {
       continue;
     }
 
-    // hungry + has money → seek trade
-    if (a.hunger < 50 && a.cash >= 50) {
+    // Trading only if no food left and still very hungry
+    if (a.hunger < 35 && a.food === 0 && a.cash >= 50) {
       let target = null;
       let bestDist = Infinity;
-
       for (let j = 0; j < agents.length; j++) {
         const b = agents[j];
         if (b === a || b.dead || b.food < 1) continue;
@@ -164,7 +178,6 @@ function step() {
           target = b;
         }
       }
-
       if (target) {
         const dx = target.x - a.x;
         const dy = target.y - a.y;
@@ -201,16 +214,16 @@ function toggleSim() {
 function resetSim() {
   tick = 0;
   logs = [];
+  totalFoodConsumed = 0;
   agents = [];
   for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-  addLog('=== SIM RESET (death enabled) ===');
+  addLog('=== SIM RESET ===');
   updateSidebar();
 }
 
 // START
 for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-addLog('=== PHASE 1 SIMPLE — DEATH ENABLED ===');
-addLog('Agents now die when hunger reaches 0');
+addLog('=== SELF-CONSUMPTION + GLOBAL METRICS ACTIVE ===');
 updateSidebar();
 setInterval(step, 32);
 draw();
