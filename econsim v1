@@ -158,13 +158,13 @@ function step() {
         // trade when close
         if (dist < 32) {
           const price = 50;
-          if (a.cash >= price) {
+          if (a.cash >= price && target.food >= 1) {
             target.food -= 1;
-            a.food += 1;
             a.cash -= price;
             target.cash += price;
+            // buyer immediately eats the food
             a.hunger = Math.min(100, a.hunger + 30);
-            addLog(`${a.name} bought 1 FOOD from ${target.name} for $${price}`);
+            addLog(`${a.name} bought & ate 1 FOOD from ${target.name} for $${price}`);
           }
         }
       }
