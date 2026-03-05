@@ -14,6 +14,7 @@ header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; 
 .btn.on { border-color:#00ff88; color:#00ff88; }
 #sidebar { width:260px; background:#0b0f15; border-left:1px solid #192130; padding:12px; overflow-y:auto; }
 .agent-card { margin-bottom:10px; padding:9px; background:#11151f; border:1px solid #1e2d3d; border-radius:2px; }
+.dead { opacity:0.45; filter:grayscale(1); }
 .log { position:absolute; bottom:0; left:0; right:0; height:140px; background:rgba(11,15,21,0.95); border-top:1px solid #192130; padding:8px 12px; font-size:10px; overflow-y:auto; line-height:1.5; }
 </style>
 </head>
@@ -25,18 +26,19 @@ header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; 
     <button onclick="resetSim()" class="btn">RESET</button>
     <span id="tickDisp" class="ml-auto font-mono">TICK: 0</span>
   </header>
-
   <div class="flex flex-1 overflow-hidden">
     <canvas id="canvas" width="940" height="700"></canvas>
-    
+   
     <!-- RIGHT PANEL -->
     <div id="sidebar">
-      <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS (cash + metrics)</div>
+      <div class="text-[#00e5ff] text-xs tracking-widest mb-3">// GLOBAL METRICS</div>
+      <div id="global-metrics" class="mb-6 text-xs bg-[#11151f] p-3 rounded border border-[#1e2d3d]"></div>
+     
+      <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS + DNA</div>
       <div id="agent-list"></div>
     </div>
   </div>
 </div>
-
 <div id="log" class="log"></div>
 
 <script>
@@ -47,6 +49,7 @@ let agents = [];
 let tick = 0;
 let running = true;
 let logs = [];
+let totalFoodConsumed = 0;
 
 // CREATE AGENT
 function createAgent(i) {
@@ -61,27 +64,43 @@ function createAgent(i) {
     food: 10,
     cash: Math.floor(Math.random()*501),
     hunger: 82,
-    visibility: 165
+    visibility: 165,
+    dead: false,
+    dna: {
+      hoardFoodBias: 0.3 + Math.random() * 0.65
+    }
   };
 }
 
 function addLog(msg) {
   logs.unshift(`[${String(tick).padStart(4,'0')}] ${msg}`);
-  if (logs.length > 30) logs.pop();
+  if (logs.length > 35) logs.pop();
   document.getElementById('log').innerHTML = logs.map(l => `<div>${l}</div>`).join('');
 }
 
 function updateSidebar() {
+  const totalFoodAvailable = agents.reduce((sum, a) => sum + (a.dead ? 0 : a.food), 0);
+ 
+  document.getElementById('global-metrics').innerHTML = `
+    <div class="grid grid-cols-2 gap-3 text-xs">
+      <div>FOOD CONSUMED</div><div class="text-emerald-400 font-bold">${totalFoodConsumed}</div>
+      <div>FOOD AVAILABLE</div><div class="text-amber-300 font-bold">${totalFoodAvailable}</div>
+    </div>
+  `;
+
   let html = '';
   agents.forEach(a => {
-    const hColor = a.hunger < 50 ? 'text-red-400' : 'text-emerald-400';
+    const status = a.dead ? '<span class="text-red-400">DEAD</span>' : '';
+    const hColor = a.dead ? 'text-red-400' : (a.hunger < 40 ? 'text-red-400' : 'text-emerald-400');
+    const hoardColor = a.dna.hoardFoodBias > 0.75 ? 'text-red-400' : 'text-amber-300';
     html += `
-      <div class="agent-card">
-        <div style="color:${a.color}" class="font-bold">${a.name}</div>
+      <div class="agent-card ${a.dead ? 'dead' : ''}">
+        <div style="color:${a.color}" class="font-bold">${a.name} ${status}</div>
         <div class="text-xs grid grid-cols-2 gap-x-4 mt-2">
           <div>CASH</div><div class="text-yellow-400">$${a.cash}</div>
           <div>FOOD</div><div class="text-amber-300">${a.food}</div>
           <div>HUNGER</div><div class="${hColor}">${Math.floor(a.hunger)}</div>
+          <div>HOARD BIAS</div><div class="${hoardColor}">${(a.dna.hoardFoodBias*100).toFixed(0)}%</div>
         </div>
       </div>`;
   });
@@ -91,7 +110,7 @@ function updateSidebar() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   agents.forEach(a => {
-    // visibility circle
+    if (a.dead) return;
     ctx.beginPath();
     ctx.arc(a.x, a.y, a.visibility, 0, Math.PI*2);
     ctx.strokeStyle = 'rgba(0,229,255,0.13)';
@@ -100,7 +119,6 @@ function draw() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // agent
     ctx.fillStyle = a.color + '44';
     ctx.fillRect(a.x-8, a.y-8, 16, 16);
     ctx.strokeStyle = a.color;
@@ -118,58 +136,91 @@ function step() {
   if (!running) return;
   tick++;
 
-  agents.forEach(a => {
-    // wander
+  for (let i = agents.length - 1; i >= 0; i--) {
+    const a = agents[i];
+    if (a.dead) continue;
+
     a.vx += (Math.random()-0.5)*0.65;
     a.vy += (Math.random()-0.5)*0.65;
     const spd = Math.hypot(a.vx, a.vy);
-    if (spd > 2.3) { a.vx = (a.vx/spd)*2.3; a.vy = (a.vy/spd)*2.3; }
+    if (spd > 2.3) {
+      a.vx = (a.vx/spd)*2.3;
+      a.vy = (a.vy/spd)*2.3;
+    }
     a.x += a.vx;
     a.y += a.vy;
 
-    // walls
-    if (a.x < 30 || a.x > 910) a.vx *= -0.88;
-    if (a.y < 30 || a.y > 670) a.vy *= -0.88;
+    if (a.x < 30) { a.x = 30; a.vx *= -0.9; }
+    if (a.x > 910) { a.x = 910; a.vx *= -0.9; }
+    if (a.y < 30) { a.y = 30; a.vy *= -0.9; }
+    if (a.y > 670) { a.y = 670; a.vy *= -0.9; }
 
-    // hunger drain
     if (tick % 10 === 0) a.hunger = Math.max(0, a.hunger - 1);
 
-    // hungry + has money → seek trade
-    if (a.hunger < 50 && a.cash >= 50) {
+    // SELF CONSUMPTION
+    if (a.hunger < 45 && a.food > 0) {
+      a.food -= 1;
+      a.hunger = Math.min(100, a.hunger + 28);
+      totalFoodConsumed++;
+      addLog(`${a.name} ate own FOOD`);
+    }
+
+    // DEATH CHECK
+    if (a.hunger <= 0) {
+      a.dead = true;
+      addLog(`💀 ${a.name} DIED OF STARVATION`);
+      continue;
+    }
+
+    // ── DNA-DRIVEN BUYING + SELLING (fixed per PM flag) ──
+    if (a.cash >= 50) {
       let target = null;
       let bestDist = Infinity;
-
-      agents.forEach(b => {
-        if (b === a || b.food < 1) return;
-        const d = Math.hypot(a.x-b.x, a.y-b.y);
+      for (let j = 0; j < agents.length; j++) {
+        const b = agents[j];
+        if (b === a || b.dead || b.food < 1) continue;
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
         if (d < a.visibility && d < bestDist) {
           bestDist = d;
           target = b;
         }
-      });
+      }
 
-      if (target) {
+      if (target && bestDist < 35) {
         const dx = target.x - a.x;
         const dy = target.y - a.y;
         const dist = Math.hypot(dx, dy) || 1;
-        a.vx += (dx/dist)*1.05;
-        a.vy += (dy/dist)*1.05;
+        a.vx += (dx/dist)*1.1;
+        a.vy += (dy/dist)*1.1;
 
-        // trade when close
-        if (dist < 32) {
+        const hoard = a.dna.hoardFoodBias;
+        const buyThreshold = 32 + (hoard * 63);
+        const minDesiredFood = 2 + Math.floor(hoard * 7);
+
+        const buyerWants = (a.hunger < buyThreshold) || (a.food < minDesiredFood);
+
+        // FIXED: seller now checks THEIR OWN hunger (target.hunger) — not buyer's
+        // Seller sells if: low hoard bias OR very desperate (hungry) OR buyer is starving
+        const sellerWantsToSell = 
+          target.dna.hoardFoodBias < 0.67 || 
+          target.hunger < 32 || 
+          a.hunger < 25;
+
+        if (buyerWants && sellerWantsToSell) {
           const price = 50;
           if (a.cash >= price && target.food >= 1) {
             target.food -= 1;
             a.cash -= price;
+		a.food += 1;
             target.cash += price;
-            // buyer immediately eats the food
-            a.hunger = Math.min(100, a.hunger + 30);
-            addLog(`${a.name} bought & ate 1 FOOD from ${target.name} for $${price}`);
+            addLog(`${a.name} <span class="text-orange-400">[${(hoard*100).toFixed(0)}% hoard]</span> bought 1 FOOD from ${target.name}`);
+            addLog(`Buyer Threshold: ${buyThreshold}`);
+            addLog(`minDesiredFood: ${minDesiredFood}`);
           }
         }
       }
     }
-  });
+  }
 
   document.getElementById('tickDisp').textContent = `TICK: ${tick}`;
   draw();
@@ -186,18 +237,17 @@ function toggleSim() {
 function resetSim() {
   tick = 0;
   logs = [];
+  totalFoodConsumed = 0;
   agents = [];
   for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-  addLog('=== SIM RESET (cash enabled) ===');
-  addLog('Food price fixed at $50/unit • Cash required to trade');
+  addLog('=== SIM RESET — Hoarding DNA Active ===');
   updateSidebar();
 }
 
 // START
 for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-addLog('=== PHASE 1 SIMPLE — CASH TRADING ACTIVE ===');
-addLog('Each agent starts with random cash 0-500');
-addLog('Hunger < 50 + $50 → seek trade (visibility shown)');
+addLog('=== DNA HOARD BIAS ACTIVE ===');
+addLog('Seller now correctly checks own hunger (fixed)');
 updateSidebar();
 setInterval(step, 32);
 draw();
