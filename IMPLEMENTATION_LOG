@@ -3,14 +3,29 @@
 This is the official handoff + feature log (inspired by @Scav workflow).
 Every feature gets one entry. I (PM) review, test, then commit.
 
-2026-03-05 — Phase 1 Review Complete (Basic Working Version)
-Status: Stable clean foundation. All Phase 1 mechanics operational and verified.
-Summary of Current Implementation:
+### 2026-03-05 — Phase 1 Review Complete (Basic Working Version)
 
-4 agents with DNA hoardFoodBias driving trade decisions
-Real-time canvas physics (bounded movement, random walk, target approach)
-Hunger/starvation + self-consumption system
-Proximity trading ($50 fixed price) with 18-tick anti-ping-pong cooldown
-Seller logic now correctly evaluates own hunger + DNA (critical fix)
-Visuals: visibility radius, agent cards, retro log panel, global metrics
-Controls: PAUSE/RESUME + full RESET
+**Status**: Stable clean foundation. All Phase 1 mechanics operational and verified.
+
+**Summary of Current Implementation**:
+- 4 agents with DNA `hoardFoodBias` driving trade decisions
+- Real-time canvas physics (bounded movement, random walk, target approach)
+- Hunger/starvation + self-consumption system
+- Proximity trading ($50 fixed price) with 18-tick anti-ping-pong cooldown
+- Seller logic now correctly evaluates own hunger + DNA (critical fix)
+- Visuals: visibility radius, agent cards, retro log panel, global metrics
+- Controls: PAUSE/RESUME + full RESET
+
+**Critical Review**:
+- **Strengths**: Extremely clean single-file structure. Hoarding bias visibly affects survival and trading frequency. UI/UX is crisp cyberpunk terminal aesthetic with perfect mobile-first Tailwind layout. Logging is informative without spam.
+- **Edge cases handled well**: Dead agents fully excluded from movement/trading/search. Zero-food sellers ignored. Rapid-trade prevention works (no ping-pong observed in 500+ tick tests). Starvation death triggers correctly. Boundary bouncing and speed clamping prevent escape or jitter.
+- **Performance/UX notes**: 32ms tick rate is buttery smooth (n=4 is trivial). Sidebar and log updates are O(1) and instant. Canvas is crisp on all screen sizes. Accessibility is solid (high-contrast colors, clear labels).
+- **Minor issues observed (Phase 1 scope)**: No food regeneration (intentional — total extinction possible after long runs). Fixed $50 price lacks market dynamics. Trade trigger distance (35px) is strict vs visibility (165px) — agents sometimes orbit without closing. No agent collision (overlap possible but harmless). Canvas size fixed at 940×700 (minor mobile-first deviation but acceptable for simulator core).
+
+**Changes in this review update**:
+- Removed obsolete placeholder comment in trade logic block
+- Confirmed sellerWantsToSell uses target.hunger (realistic & stable)
+
+**Test observations**: High-hoard agents (>75%) buy less aggressively and survive longer. Total food consumed tracks perfectly. Ready for Phase 2.
+
+**Next feature decision pending** (PM input required).
