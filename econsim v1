@@ -1,266 +1,365 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>EconSim — Phase 1 Simple</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-body { margin:0; overflow:hidden; background:#07090d; color:#b8ccd8; font-family:'Share Tech Mono',monospace; }
-canvas { display:block; background:#0b0f15; }
-header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; display:flex; align-items:center; gap:12px; font-size:12px; flex-shrink:0; }
-.btn { padding:4px 12px; background:transparent; border:1px solid #1e2d3d; color:#b8ccd8; cursor:pointer; transition:all .2s; }
-.btn:hover { border-color:#00e5ff; color:#00e5ff; }
-.btn.on { border-color:#00ff88; color:#00ff88; }
-#sidebar { width:260px; background:#0b0f15; border-left:1px solid #192130; padding:12px; overflow-y:auto; }
-.agent-card { margin-bottom:10px; padding:9px; background:#11151f; border:1px solid #1e2d3d; border-radius:2px; }
-.dead { opacity:0.45; filter:grayscale(1); }
-.log { position:absolute; bottom:0; left:0; right:0; height:140px; background:rgba(11,15,21,0.95); border-top:1px solid #192130; padding:8px 12px; font-size:10px; overflow-y:auto; line-height:1.5; }
-</style>
+  <meta charset="UTF-8">
+  <title>EconSim — Phase 1 Simple</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    body { margin:0; overflow:hidden; background:#07090d; color:#b8ccd8; font-family:'Share Tech Mono',monospace; }
+    canvas { display:block; background:#0b0f15; }
+    header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; display:flex; align-items:center; gap:12px; font-size:12px; flex-shrink:0; }
+    .btn { padding:4px 12px; background:transparent; border:1px solid #1e2d3d; color:#b8ccd8; cursor:pointer; transition:all .2s; }
+    .btn:hover { border-color:#00e5ff; color:#00e5ff; }
+    .btn.on { border-color:#00ff88; color:#00ff88; }
+    #sidebar { width:260px; background:#0b0f15; border-left:1px solid #192130; padding:12px; overflow-y:auto; }
+    .agent-card { margin-bottom:10px; padding:9px; background:#11151f; border:1px solid #1e2d3d; border-radius:2px; }
+    .dead { opacity:0.45; filter:grayscale(1); }
+    .log { position:absolute; bottom:0; left:0; right:0; height:140px; background:rgba(11,15,21,0.95); border-top:1px solid #192130; padding:8px 12px; font-size:10px; overflow-y:auto; line-height:1.5; }
+  </style>
 </head>
 <body>
-<div class="flex flex-col h-screen">
-  <header>
-    <span class="text-[#00e5ff]">// ECONSIM PHASE 1 SIMPLE</span>
-    <button onclick="toggleSim()" id="toggleBtn" class="btn on">PAUSE</button>
-    <button onclick="resetSim()" class="btn">RESET</button>
-    <span id="tickDisp" class="ml-auto font-mono">TICK: 0</span>
-  </header>
-  <div class="flex flex-1 overflow-hidden">
-    <canvas id="canvas" width="940" height="700"></canvas>
-   
-    <!-- RIGHT PANEL -->
-    <div id="sidebar">
-      <div class="text-[#00e5ff] text-xs tracking-widest mb-3">// GLOBAL METRICS</div>
-      <div id="global-metrics" class="mb-6 text-xs bg-[#11151f] p-3 rounded border border-[#1e2d3d]"></div>
-     
-      <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS + DNA</div>
-      <div id="agent-list"></div>
+  <div class="flex flex-col h-screen">
+    <header>
+      <span class="text-[#00e5ff]">// ECONSIM PHASE 1 SIMPLE</span>
+      <button onclick="toggleSim()" id="toggleBtn" class="btn on">PAUSE</button>
+      <button onclick="resetSim()" class="btn">RESET</button>
+      <span id="tickDisp" class="ml-auto font-mono">TICK: 0</span>
+    </header>
+    <div class="flex flex-1 overflow-hidden">
+      <canvas id="canvas" width="940" height="700"></canvas>
+      <!-- RIGHT PANEL -->
+      <div id="sidebar">
+        <div class="text-[#00e5ff] text-xs tracking-widest mb-3">// GLOBAL METRICS</div>
+        <div id="global-metrics" class="mb-6 text-xs bg-[#11151f] p-3 rounded border border-[#1e2d3d]"></div>
+        <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS + DNA</div>
+        <div id="agent-list"></div>
+      </div>
     </div>
   </div>
-</div>
-<div id="log" class="log"></div>
+  <div id="log" class="log"></div>
 
-<script>
-// STATE
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let agents = [];
-let tick = 0;
-let running = true;
-let logs = [];
-let totalFoodConsumed = 0;
+  <script>
+    // ─────────────────────────────────────────────
+    // CANVAS + GLOBAL STATE
+    // ─────────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-// CREATE AGENT
-function createAgent(i) {
-  return {
-    id: i,
-    name: ['APEX','BOLT','CRUS','DUNE'][i],
-    color: ['#00e5ff','#00ff88','#ffd600','#bf40ff'][i],
-    x: 180 + Math.random()*650,
-    y: 120 + Math.random()*460,
-    vx: (Math.random()-0.5)*2.1,
-    vy: (Math.random()-0.5)*2.1,
-    food: 10,
-    cash: Math.floor(Math.random()*501),
-    hunger: 82,
-    visibility: 165,
-    dead: false,
-lastTradeTick: 0,
-    dna: {
-      hoardFoodBias: 0.3 + Math.random() * 0.65
-    }
-  };
-}
+    let agents = [];
+    let tick = 0;
+    let running = true;
+    let logs = [];
+    let totalFoodConsumed = 0;
 
-function addLog(msg) {
-  logs.unshift(`[${String(tick).padStart(4,'0')}] ${msg}`);
-  if (logs.length > 35) logs.pop();
-  document.getElementById('log').innerHTML = logs.map(l => `<div>${l}</div>`).join('');
-}
+    // simInterval holds the setInterval reference so it can be cleared on reset.
+    // FIX #11: Without storing this, calling resetSim() repeatedly stacks multiple
+    // intervals and the sim runs faster and faster with each reset.
+    let simInterval = null;
 
-function updateSidebar() {
-  const totalFoodAvailable = agents.reduce((sum, a) => sum + (a.dead ? 0 : a.food), 0);
- 
-  document.getElementById('global-metrics').innerHTML = `
-    <div class="grid grid-cols-2 gap-3 text-xs">
-      <div>FOOD CONSUMED</div><div class="text-emerald-400 font-bold">${totalFoodConsumed}</div>
-      <div>FOOD AVAILABLE</div><div class="text-amber-300 font-bold">${totalFoodAvailable}</div>
-    </div>
-  `;
+    // ─────────────────────────────────────────────
+    // AGENT FACTORY
+    // ─────────────────────────────────────────────
+    function createAgent(i) {
+      return {
+        id: i,
+        name: ['APEX', 'BOLT', 'CRUS', 'DUNE'][i],
+        color: ['#00e5ff', '#00ff88', '#ffd600', '#bf40ff'][i],
+        x: 180 + Math.random() * 650,
+        y: 120 + Math.random() * 460,
+        vx: (Math.random() - 0.5) * 2.1,
+        vy: (Math.random() - 0.5) * 2.1,
+        food: 10,
+        cash: Math.floor(Math.random() * 501),
+        hunger: 82,
+        visibility: 165,  // radius of the sight circle drawn on canvas
+        dead: false,
 
-  let html = '';
-  agents.forEach(a => {
-    const status = a.dead ? '<span class="text-red-400">DEAD</span>' : '';
-    const hColor = a.dead ? 'text-red-400' : (a.hunger < 40 ? 'text-red-400' : 'text-emerald-400');
-    const hoardColor = a.dna.hoardFoodBias > 0.75 ? 'text-red-400' : 'text-amber-300';
-    html += `
-      <div class="agent-card ${a.dead ? 'dead' : ''}">
-        <div style="color:${a.color}" class="font-bold">${a.name} ${status}</div>
-        <div class="text-xs grid grid-cols-2 gap-x-4 mt-2">
-          <div>CASH</div><div class="text-yellow-400">$${a.cash}</div>
-          <div>FOOD</div><div class="text-amber-300">${a.food}</div>
-          <div>HUNGER</div><div class="${hColor}">${Math.floor(a.hunger)}</div>
-          <div>HOARD BIAS</div><div class="${hoardColor}">${(a.dna.hoardFoodBias*100).toFixed(0)}%</div>
-        </div>
-      </div>`;
-  });
-  document.getElementById('agent-list').innerHTML = html;
-}
+        // FIX #5: Initialize to -18 (not 0) so the trade cooldown
+        // (tick - lastTradeTick < 18) doesn't block trades in the first 18 ticks.
+        lastTradeTick: -18,
 
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  agents.forEach(a => {
-    if (a.dead) return;
-    ctx.beginPath();
-    ctx.arc(a.x, a.y, a.visibility, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(0,229,255,0.13)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([3,4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = a.color + '44';
-    ctx.fillRect(a.x-8, a.y-8, 16, 16);
-    ctx.strokeStyle = a.color;
-    ctx.lineWidth = 2.5;
-    ctx.strokeRect(a.x-8, a.y-8, 16, 16);
-
-    ctx.fillStyle = '#fff';
-    ctx.font = '9px Share Tech Mono';
-    ctx.textAlign = 'center';
-    ctx.fillText(a.name, a.x, a.y-14);
-  });
-}
-
-function step() {
-  if (!running) return;
-  tick++;
-
-  for (let i = agents.length - 1; i >= 0; i--) {
-    const a = agents[i];
-    if (a.dead) continue;
-
-    a.vx += (Math.random()-0.5)*0.65;
-    a.vy += (Math.random()-0.5)*0.65;
-    const spd = Math.hypot(a.vx, a.vy);
-    if (spd > 2.3) {
-      a.vx = (a.vx/spd)*2.3;
-      a.vy = (a.vy/spd)*2.3;
-    }
-    a.x += a.vx;
-    a.y += a.vy;
-
-    if (a.x < 30) { a.x = 30; a.vx *= -0.9; }
-    if (a.x > 910) { a.x = 910; a.vx *= -0.9; }
-    if (a.y < 30) { a.y = 30; a.vy *= -0.9; }
-    if (a.y > 670) { a.y = 670; a.vy *= -0.9; }
-
-    if (tick % 10 === 0) a.hunger = Math.max(0, a.hunger - 1);
-
-    // SELF CONSUMPTION
-    if (a.hunger < 45 && a.food > 0) {
-      a.food -= 1;
-      a.hunger = Math.min(100, a.hunger + 28);
-      totalFoodConsumed++;
-      addLog(`${a.name} ate own FOOD`);
-    }
-
-    // DEATH CHECK
-    if (a.hunger <= 0) {
-      a.dead = true;
-      addLog(`💀 ${a.name} DIED OF STARVATION`);
-      continue;
-    }
-
-    // ── DNA-DRIVEN BUYING + SELLING (fixed per PM flag) ──
-    if (a.cash >= 50) {
-      let target = null;
-      let bestDist = Infinity;
-      for (let j = 0; j < agents.length; j++) {
-        const b = agents[j];
-        if (b === a || b.dead || b.food < 1) continue;
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < a.visibility && d < bestDist) {
-          bestDist = d;
-          target = b;
+        dna: {
+          // hoardFoodBias: 0.0–1.0
+          // High = agent holds onto food; low = willing to sell early
+          hoardFoodBias: 0.3 + Math.random() * 0.65
         }
-      }
+      };
+    }
 
-      if (target && bestDist < 35) {
-        const dx = target.x - a.x;
-        const dy = target.y - a.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        a.vx += (dx/dist)*1.1;
-        a.vy += (dy/dist)*1.1;
-	
-	// ANTI-PING-PONG: skip if either just traded
-if (tick - a.lastTradeTick < 18 || tick - target.lastTradeTick < 18) {
-  // no trade this tick — they separate naturally
-} else {
-  // ← your existing buyerWants + sellerWantsToSell + trade code goes here
+    // ─────────────────────────────────────────────
+    // LOGGING
+    // ─────────────────────────────────────────────
+    function addLog(msg) {
+      logs.unshift(`[${String(tick).padStart(4, '0')}] ${msg}`);
+      if (logs.length > 35) logs.pop();
+      document.getElementById('log').innerHTML = logs.map(l => `<div>${l}</div>`).join('');
+    }
 
-        const hoard = a.dna.hoardFoodBias;
-        const buyThreshold = 32 + (hoard * 63);
-        const minDesiredFood = 2 + Math.floor(hoard * 7);
+    // ─────────────────────────────────────────────
+    // SIDEBAR UPDATE
+    // ─────────────────────────────────────────────
+    function updateSidebar() {
+      const totalFoodAvailable = agents.reduce((sum, a) => sum + (a.dead ? 0 : a.food), 0);
 
-        const buyerWants = (a.hunger < buyThreshold) || (a.food < minDesiredFood);
+      document.getElementById('global-metrics').innerHTML = `
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div>FOOD CONSUMED</div>
+          <div class="text-emerald-400 font-bold">${totalFoodConsumed}</div>
+          <div>FOOD AVAILABLE</div>
+          <div class="text-amber-300 font-bold">${totalFoodAvailable}</div>
+        </div>
+      `;
 
-        // FIXED: seller now checks THEIR OWN hunger (target.hunger) — not buyer's
-        // Seller sells if: low hoard bias OR very desperate (hungry) OR buyer is starving
-        const sellerWantsToSell = 
-          target.dna.hoardFoodBias < 0.67 || 
-          target.hunger > 68 || 
-          a.hunger < 25;
+      let html = '';
+      agents.forEach(a => {
+        const status = a.dead ? '<span class="text-red-400">DEAD</span>' : '';
+        const hColor = a.dead ? 'text-red-400' : (a.hunger < 40 ? 'text-red-400' : 'text-emerald-400');
+        const hoardColor = a.dna.hoardFoodBias > 0.75 ? 'text-red-400' : 'text-amber-300';
+        html += `
+          <div class="agent-card ${a.dead ? 'dead' : ''}">
+            <div style="color:${a.color}" class="font-bold">${a.name} ${status}</div>
+            <div class="text-xs grid grid-cols-2 gap-x-4 mt-2">
+              <div>CASH</div><div class="text-yellow-400">$${a.cash}</div>
+              <div>FOOD</div><div class="text-amber-300">${a.food}</div>
+              <div>HUNGER</div><div class="${hColor}">${Math.floor(a.hunger)}</div>
+              <div>HOARD BIAS</div><div class="${hoardColor}">${(a.dna.hoardFoodBias * 100).toFixed(0)}%</div>
+            </div>
+          </div>`;
+      });
+      document.getElementById('agent-list').innerHTML = html;
+    }
 
-        if (buyerWants && sellerWantsToSell) {
-          const price = 50;
-          if (a.cash >= price && target.food >= 1) {
-            target.food -= 1;
-            a.cash -= price;
-		a.food += 1;
-            target.cash += price;
-a.lastTradeTick = tick;
-target.lastTradeTick = tick;
-            addLog(`${a.name} <span class="text-orange-400">[${(hoard*100).toFixed(0)}% hoard]</span> bought 1 FOOD from ${target.name}`);
-            addLog(`Buyer Threshold: ${buyThreshold}`);
-            addLog(`minDesiredFood: ${minDesiredFood}`);
-}
+    // ─────────────────────────────────────────────
+    // DRAW — called every tick
+    // FIX #9: ctx.clearRect at the top of draw() wipes the entire canvas each
+    // frame before redrawing. This prevents dead agents' visibility rings from
+    // "ghosting" — lingering on screen after the agent dies. Only living agents
+    // are drawn (if (a.dead) return), so once dead they vanish cleanly next frame.
+    // ─────────────────────────────────────────────
+    function draw() {
+      // Wipe canvas completely — no previous frame content survives
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      agents.forEach(a => {
+        if (a.dead) return; // skip dead agents — ring + body both omitted
+
+        // Visibility ring (sight radius)
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.visibility, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,229,255,0.13)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Agent body (filled square with colored border)
+        ctx.fillStyle = a.color + '44';
+        ctx.fillRect(a.x - 8, a.y - 8, 16, 16);
+        ctx.strokeStyle = a.color;
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(a.x - 8, a.y - 8, 16, 16);
+
+        // Name label above agent
+        ctx.fillStyle = '#fff';
+        ctx.font = '9px Share Tech Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText(a.name, a.x, a.y - 14);
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // SIMULATION STEP — runs every 32ms
+    // ─────────────────────────────────────────────
+    function step() {
+      if (!running) return;
+      tick++;
+
+      // Iterate backwards so we can safely skip dead agents
+      // without index shifting affecting remaining agents
+      for (let i = agents.length - 1; i >= 0; i--) {
+        const a = agents[i];
+        if (a.dead) continue;
+
+        // ── MOVEMENT ──
+        // Add small random nudge to velocity each tick (Brownian motion)
+        a.vx += (Math.random() - 0.5) * 0.65;
+        a.vy += (Math.random() - 0.5) * 0.65;
+
+        // Clamp speed to max 2.3 units/tick
+        const spd = Math.hypot(a.vx, a.vy);
+        if (spd > 2.3) {
+          a.vx = (a.vx / spd) * 2.3;
+          a.vy = (a.vy / spd) * 2.3;
+        }
+
+        a.x += a.vx;
+        a.y += a.vy;
+
+        // Bounce off canvas walls with slight damping
+        if (a.x < 30)  { a.x = 30;  a.vx *= -0.9; }
+        if (a.x > 910) { a.x = 910; a.vx *= -0.9; }
+        if (a.y < 30)  { a.y = 30;  a.vy *= -0.9; }
+        if (a.y > 670) { a.y = 670; a.vy *= -0.9; }
+
+        // ── HUNGER DECAY ──
+        // Hunger drops by 1 every 10 ticks (~3.2 seconds at 32ms interval)
+        if (tick % 10 === 0) {
+          a.hunger = Math.max(0, a.hunger - 1);
+        }
+
+        // ── SELF CONSUMPTION ──
+        // If hungry enough and holding food, eat one unit immediately
+        if (a.hunger < 45 && a.food > 0) {
+          a.food -= 1;
+          a.hunger = Math.min(100, a.hunger + 28);
+          totalFoodConsumed++;
+          addLog(`${a.name} ate own FOOD`);
+        }
+
+        // ── DEATH CHECK ──
+        // Agent dies if hunger reaches zero (no food left to self-consume)
+        if (a.hunger <= 0) {
+          a.dead = true;
+          addLog(`💀 ${a.name} DIED OF STARVATION`);
+          continue; // skip rest of this agent's tick logic
+        }
+
+        // ── DNA-DRIVEN TRADING ──
+        // Buyer searches for the nearest living seller within visibility range.
+        // Only initiates a chase if it has enough cash to afford a trade.
+        if (a.cash >= 50) {
+          let target = null;
+          let bestDist = Infinity;
+
+          for (let j = 0; j < agents.length; j++) {
+            const b = agents[j];
+            if (b === a || b.dead || b.food < 1) continue;
+
+            const d = Math.hypot(a.x - b.x, a.y - b.y);
+            // Only consider sellers within sight radius; pick the closest
+            if (d < a.visibility && d < bestDist) {
+              bestDist = d;
+              target = b;
+            }
+          }
+
+          if (target) {
+            // Steer buyer toward target (add velocity nudge toward seller)
+            const dx = target.x - a.x;
+            const dy = target.y - a.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            a.vx += (dx / dist) * 1.1;
+            a.vy += (dy / dist) * 1.1;
+
+            // ── TRADE EXECUTION ──
+            // Only attempt trade if both agents are within 35px of each other.
+            // The 35px contact threshold is separate from visibility (165px) —
+            // see comment in IMPLEMENTATION_LOG about issue #7.
+            if (bestDist < 35) {
+
+              // FIX #5: Anti-ping-pong cooldown.
+              // After a trade, both agents wait 18 ticks before trading again.
+              // This prevents them from instantly re-trading the same food unit back.
+              // Initializing lastTradeTick to -18 (not 0) ensures this cooldown
+              // doesn't incorrectly block trades at the very start of the sim.
+              const onCooldown = (tick - a.lastTradeTick < 18) || (tick - target.lastTradeTick < 18);
+
+              if (!onCooldown) {
+                // Buyer's hoard bias determines how hungry/low they need to be before buying
+                const hoard = a.dna.hoardFoodBias;
+                const buyThreshold = 32 + (hoard * 63);       // hunger below this = wants to buy
+                const minDesiredFood = 2 + Math.floor(hoard * 7); // also buys if food stock is low
+
+                const buyerWants = (a.hunger < buyThreshold) || (a.food < minDesiredFood);
+
+                // Seller's decision is based on THEIR OWN state:
+                // sells if low hoard bias, or full (hunger > 68), or buyer is starving
+                const sellerWantsToSell =
+                  target.dna.hoardFoodBias < 0.67 ||
+                  target.hunger > 68 ||
+                  a.hunger < 25;
+
+                // FIX #6: Re-check target isn't dead before executing trade.
+                // Technically JS is single-threaded so mid-loop death can't happen,
+                // but target could have died earlier in this same tick's iteration.
+                if (buyerWants && sellerWantsToSell && !target.dead && target.food >= 1) {
+                  const price = 50;
+                  if (a.cash >= price) {
+                    // Execute the trade
+                    target.food -= 1;
+                    a.cash     -= price;
+                    a.food     += 1;
+                    target.cash += price;
+
+                    // Stamp both agents with this tick to trigger cooldown
+                    a.lastTradeTick     = tick;
+                    target.lastTradeTick = tick;
+
+                    addLog(`${a.name} [${(hoard * 100).toFixed(0)}% hoard] bought 1 FOOD from ${target.name}`);
+                  }
+                }
+              }
+            }
           }
         }
-      }
+      } // end agent loop
+
+      // Update HUD
+      document.getElementById('tickDisp').textContent = `TICK: ${tick}`;
+      draw();
+      updateSidebar();
     }
-  }
 
-  document.getElementById('tickDisp').textContent = `TICK: ${tick}`;
-  draw();
-  updateSidebar();
-}
+    // ─────────────────────────────────────────────
+    // CONTROLS
+    // ─────────────────────────────────────────────
+    function toggleSim() {
+      running = !running;
+      const btn = document.getElementById('toggleBtn');
+      btn.textContent = running ? 'PAUSE' : 'RESUME';
+      btn.classList.toggle('on', running);
+    }
 
-function toggleSim() {
-  running = !running;
-  const btn = document.getElementById('toggleBtn');
-  btn.textContent = running ? 'PAUSE' : 'RESUME';
-  btn.classList.toggle('on', running);
-}
+    function resetSim() {
+      // FIX #11: Clear the existing interval before starting a new one.
+      // Without this, each resetSim() call stacks a second (third, fourth...)
+      // setInterval on top of the previous one, causing the sim to run at
+      // 2x, 3x, 4x speed with each reset. clearInterval(simInterval) kills
+      // the old loop; we then re-assign simInterval below.
+      if (simInterval) clearInterval(simInterval);
 
-function resetSim() {
-  tick = 0;
-  logs = [];
-  totalFoodConsumed = 0;
-  agents = [];
-  for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-  addLog('=== SIM RESET — Hoarding DNA Active ===');
-  updateSidebar();
-}
+      tick = 0;
+      logs = [];
+      totalFoodConsumed = 0;
+      agents = [];
+      running = true;
 
-// START
-for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-addLog('=== DNA HOARD BIAS ACTIVE ===');
-addLog('Seller now correctly checks own hunger (fixed)');
-updateSidebar();
-setInterval(step, 32);
-draw();
-</script>
+      for (let i = 0; i < 4; i++) agents.push(createAgent(i));
+
+      const btn = document.getElementById('toggleBtn');
+      btn.textContent = 'PAUSE';
+      btn.classList.add('on');
+
+      addLog('=== SIM RESET — Hoarding DNA Active ===');
+      updateSidebar();
+      draw();
+
+      // Start fresh interval and store reference for future resets
+      simInterval = setInterval(step, 32);
+    }
+
+    // ─────────────────────────────────────────────
+    // INIT — run once on page load
+    // ─────────────────────────────────────────────
+    for (let i = 0; i < 4; i++) agents.push(createAgent(i));
+    addLog('=== DNA HOARD BIAS ACTIVE ===');
+    addLog('Seller correctly checks own hunger');
+    updateSidebar();
+    draw();
+
+    // Store interval ref from the start so resetSim() can clear it properly
+    simInterval = setInterval(step, 32);
+  </script>
 </body>
 </html>
