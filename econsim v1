@@ -211,10 +211,11 @@ function step() {
           if (a.cash >= price && target.food >= 1) {
             target.food -= 1;
             a.cash -= price;
+		a.food += 1;
             target.cash += price;
-            a.hunger = Math.min(100, a.hunger + 30);
-            totalFoodConsumed++;
             addLog(`${a.name} <span class="text-orange-400">[${(hoard*100).toFixed(0)}% hoard]</span> bought 1 FOOD from ${target.name}`);
+            addLog(`Buyer Threshold: ${buyThreshold}`);
+            addLog(`minDesiredFood: ${minDesiredFood}`);
           }
         }
       }
