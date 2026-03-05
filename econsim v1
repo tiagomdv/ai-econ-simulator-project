@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EconSim — Phase 1 Simple</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+body { margin:0; overflow:hidden; background:#07090d; color:#b8ccd8; font-family:'Share Tech Mono',monospace; }
+canvas { display:block; background:#0b0f15; }
+header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; display:flex; align-items:center; gap:12px; font-size:12px; flex-shrink:0; }
+.btn { padding:4px 12px; background:transparent; border:1px solid #1e2d3d; color:#b8ccd8; cursor:pointer; transition:all .2s; }
+.btn:hover { border-color:#00e5ff; color:#00e5ff; }
+.btn.on { border-color:#00ff88; color:#00ff88; }
+#sidebar { width:260px; background:#0b0f15; border-left:1px solid #192130; padding:12px; overflow-y:auto; }
+.agent-card { margin-bottom:10px; padding:9px; background:#11151f; border:1px solid #1e2d3d; border-radius:2px; }
+.log { position:absolute; bottom:0; left:0; right:0; height:140px; background:rgba(11,15,21,0.95); border-top:1px solid #192130; padding:8px 12px; font-size:10px; overflow-y:auto; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="flex flex-col h-screen">
+  <header>
+    <span class="text-[#00e5ff]">// ECONSIM PHASE 1 SIMPLE</span>
+    <button onclick="toggleSim()" id="toggleBtn" class="btn on">PAUSE</button>
+    <button onclick="resetSim()" class="btn">RESET</button>
+    <span id="tickDisp" class="ml-auto font-mono">TICK: 0</span>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <canvas id="canvas" width="940" height="700"></canvas>
+    
+    <!-- RIGHT PANEL -->
+    <div id="sidebar">
+      <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS (cash + metrics)</div>
+      <div id="agent-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="log" class="log"></div>
+
+<script>
+// STATE
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let agents = [];
+let tick = 0;
+let running = true;
+let logs = [];
+
+// CREATE AGENT
+function createAgent(i) {
+  return {
+    id: i,
+    name: ['APEX','BOLT','CRUS','DUNE'][i],
+    color: ['#00e5ff','#00ff88','#ffd600','#bf40ff'][i],
+    x: 180 + Math.random()*650,
+    y: 120 + Math.random()*460,
+    vx: (Math.random()-0.5)*2.1,
+    vy: (Math.random()-0.5)*2.1,
+    food: 10,
+    cash: Math.floor(Math.random()*501),
+    hunger: 82,
+    visibility: 165
+  };
+}
+
+function addLog(msg) {
+  logs.unshift(`[${String(tick).padStart(4,'0')}] ${msg}`);
+  if (logs.length > 30) logs.pop();
+  document.getElementById('log').innerHTML = logs.map(l => `<div>${l}</div>`).join('');
+}
+
+function updateSidebar() {
+  let html = '';
+  agents.forEach(a => {
+    const hColor = a.hunger < 50 ? 'text-red-400' : 'text-emerald-400';
+    html += `
+      <div class="agent-card">
+        <div style="color:${a.color}" class="font-bold">${a.name}</div>
+        <div class="text-xs grid grid-cols-2 gap-x-4 mt-2">
+          <div>CASH</div><div class="text-yellow-400">$${a.cash}</div>
+          <div>FOOD</div><div class="text-amber-300">${a.food}</div>
+          <div>HUNGER</div><div class="${hColor}">${Math.floor(a.hunger)}</div>
+        </div>
+      </div>`;
+  });
+  document.getElementById('agent-list').innerHTML = html;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  agents.forEach(a => {
+    // visibility circle
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.visibility, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(0,229,255,0.13)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // agent
+    ctx.fillStyle = a.color + '44';
+    ctx.fillRect(a.x-8, a.y-8, 16, 16);
+    ctx.strokeStyle = a.color;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(a.x-8, a.y-8, 16, 16);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '9px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(a.name, a.x, a.y-14);
+  });
+}
+
+function step() {
+  if (!running) return;
+  tick++;
+
+  agents.forEach(a => {
+    // wander
+    a.vx += (Math.random()-0.5)*0.65;
+    a.vy += (Math.random()-0.5)*0.65;
+    const spd = Math.hypot(a.vx, a.vy);
+    if (spd > 2.3) { a.vx = (a.vx/spd)*2.3; a.vy = (a.vy/spd)*2.3; }
+    a.x += a.vx;
+    a.y += a.vy;
+
+    // walls
+    if (a.x < 30 || a.x > 910) a.vx *= -0.88;
+    if (a.y < 30 || a.y > 670) a.vy *= -0.88;
+
+    // hunger drain
+    if (tick % 10 === 0) a.hunger = Math.max(0, a.hunger - 1);
+
+    // hungry + has money → seek trade
+    if (a.hunger < 50 && a.cash >= 50) {
+      let target = null;
+      let bestDist = Infinity;
+
+      agents.forEach(b => {
+        if (b === a || b.food < 1) return;
+        const d = Math.hypot(a.x-b.x, a.y-b.y);
+        if (d < a.visibility && d < bestDist) {
+          bestDist = d;
+          target = b;
+        }
+      });
+
+      if (target) {
+        const dx = target.x - a.x;
+        const dy = target.y - a.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        a.vx += (dx/dist)*1.05;
+        a.vy += (dy/dist)*1.05;
+
+        // trade when close
+        if (dist < 32) {
+          const price = 50;
+          if (a.cash >= price) {
+            target.food -= 1;
+            a.food += 1;
+            a.cash -= price;
+            target.cash += price;
+            a.hunger = Math.min(100, a.hunger + 30);
+            addLog(`${a.name} bought 1 FOOD from ${target.name} for $${price}`);
+          }
+        }
+      }
+    }
+  });
+
+  document.getElementById('tickDisp').textContent = `TICK: ${tick}`;
+  draw();
+  updateSidebar();
+}
+
+function toggleSim() {
+  running = !running;
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = running ? 'PAUSE' : 'RESUME';
+  btn.classList.toggle('on', running);
+}
+
+function resetSim() {
+  tick = 0;
+  logs = [];
+  agents = [];
+  for (let i = 0; i < 4; i++) agents.push(createAgent(i));
+  addLog('=== SIM RESET (cash enabled) ===');
+  addLog('Food price fixed at $50/unit • Cash required to trade');
+  updateSidebar();
+}
+
+// START
+for (let i = 0; i < 4; i++) agents.push(createAgent(i));
+addLog('=== PHASE 1 SIMPLE — CASH TRADING ACTIVE ===');
+addLog('Each agent starts with random cash 0-500');
+addLog('Hunger < 50 + $50 → seek trade (visibility shown)');
+updateSidebar();
+setInterval(step, 32);
+draw();
+</script>
+</body>
+</html>
