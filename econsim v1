@@ -66,6 +66,7 @@ function createAgent(i) {
     hunger: 82,
     visibility: 165,
     dead: false,
+lastTradeTick: 0,
     dna: {
       hoardFoodBias: 0.3 + Math.random() * 0.65
     }
@@ -192,6 +193,12 @@ function step() {
         const dist = Math.hypot(dx, dy) || 1;
         a.vx += (dx/dist)*1.1;
         a.vy += (dy/dist)*1.1;
+	
+	// ANTI-PING-PONG: skip if either just traded
+if (tick - a.lastTradeTick < 18 || tick - target.lastTradeTick < 18) {
+  // no trade this tick — they separate naturally
+} else {
+  // ← your existing buyerWants + sellerWantsToSell + trade code goes here
 
         const hoard = a.dna.hoardFoodBias;
         const buyThreshold = 32 + (hoard * 63);
@@ -203,7 +210,7 @@ function step() {
         // Seller sells if: low hoard bias OR very desperate (hungry) OR buyer is starving
         const sellerWantsToSell = 
           target.dna.hoardFoodBias < 0.67 || 
-          target.hunger < 32 || 
+          target.hunger > 68 || 
           a.hunger < 25;
 
         if (buyerWants && sellerWantsToSell) {
@@ -213,9 +220,12 @@ function step() {
             a.cash -= price;
 		a.food += 1;
             target.cash += price;
+a.lastTradeTick = tick;
+target.lastTradeTick = tick;
             addLog(`${a.name} <span class="text-orange-400">[${(hoard*100).toFixed(0)}% hoard]</span> bought 1 FOOD from ${target.name}`);
             addLog(`Buyer Threshold: ${buyThreshold}`);
             addLog(`minDesiredFood: ${minDesiredFood}`);
+}
           }
         }
       }
