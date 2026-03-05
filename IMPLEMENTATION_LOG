@@ -3,12 +3,14 @@
 This is the official handoff + feature log (inspired by @Scav workflow).
 Every feature gets one entry. I (PM) review, test, then commit.
 
-## [2026-03-05] Initial Setup
-Status: Done
-Commit: (will be added after first commit)
-Decisions: Created clean structure with 4 core files
-Risks: None
-Reviewer notes: N/A
-Next: Upload existing index.html + first real feature
+2026-03-05 — Phase 1 Review Complete (Basic Working Version)
+Status: Stable clean foundation. All Phase 1 mechanics operational and verified.
+Summary of Current Implementation:
 
-[Add every new feature here — I will tell you what to paste]
+4 agents with DNA hoardFoodBias driving trade decisions
+Real-time canvas physics (bounded movement, random walk, target approach)
+Hunger/starvation + self-consumption system
+Proximity trading ($50 fixed price) with 18-tick anti-ping-pong cooldown
+Seller logic now correctly evaluates own hunger + DNA (critical fix)
+Visuals: visibility radius, agent cards, retro log panel, global metrics
+Controls: PAUSE/RESUME + full RESET
