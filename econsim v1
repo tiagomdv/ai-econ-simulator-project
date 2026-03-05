@@ -14,6 +14,7 @@ header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; 
 .btn.on { border-color:#00ff88; color:#00ff88; }
 #sidebar { width:260px; background:#0b0f15; border-left:1px solid #192130; padding:12px; overflow-y:auto; }
 .agent-card { margin-bottom:10px; padding:9px; background:#11151f; border:1px solid #1e2d3d; border-radius:2px; }
+.dead { opacity:0.45; filter:grayscale(1); }
 .log { position:absolute; bottom:0; left:0; right:0; height:140px; background:rgba(11,15,21,0.95); border-top:1px solid #192130; padding:8px 12px; font-size:10px; overflow-y:auto; line-height:1.5; }
 </style>
 </head>
@@ -61,7 +62,8 @@ function createAgent(i) {
     food: 10,
     cash: Math.floor(Math.random()*501),
     hunger: 82,
-    visibility: 165
+    visibility: 165,
+    dead: false
   };
 }
 
@@ -74,10 +76,11 @@ function addLog(msg) {
 function updateSidebar() {
   let html = '';
   agents.forEach(a => {
-    const hColor = a.hunger < 50 ? 'text-red-400' : 'text-emerald-400';
+    const status = a.dead ? '<span class="text-red-400">DEAD</span>' : '';
+    const hColor = a.dead ? 'text-red-400' : (a.hunger < 50 ? 'text-red-400' : 'text-emerald-400');
     html += `
-      <div class="agent-card">
-        <div style="color:${a.color}" class="font-bold">${a.name}</div>
+      <div class="agent-card ${a.dead ? 'dead' : ''}">
+        <div style="color:${a.color}" class="font-bold">${a.name} ${status}</div>
         <div class="text-xs grid grid-cols-2 gap-x-4 mt-2">
           <div>CASH</div><div class="text-yellow-400">$${a.cash}</div>
           <div>FOOD</div><div class="text-amber-300">${a.food}</div>
@@ -91,6 +94,8 @@ function updateSidebar() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   agents.forEach(a => {
+    if (a.dead) return;
+
     // visibility circle
     ctx.beginPath();
     ctx.arc(a.x, a.y, a.visibility, 0, Math.PI*2);
@@ -118,7 +123,10 @@ function step() {
   if (!running) return;
   tick++;
 
-  agents.forEach(a => {
+  for (let i = agents.length - 1; i >= 0; i--) {
+    const a = agents[i];
+    if (a.dead) continue;
+
     // wander
     a.vx += (Math.random()-0.5)*0.65;
     a.vy += (Math.random()-0.5)*0.65;
@@ -127,26 +135,35 @@ function step() {
     a.x += a.vx;
     a.y += a.vy;
 
-    // walls
     if (a.x < 30 || a.x > 910) a.vx *= -0.88;
     if (a.y < 30 || a.y > 670) a.vy *= -0.88;
 
     // hunger drain
-    if (tick % 10 === 0) a.hunger = Math.max(0, a.hunger - 1);
+    if (tick % 10 === 0) {
+      a.hunger = Math.max(0, a.hunger - 1);
+    }
+
+    // DEATH CHECK
+    if (a.hunger <= 0) {
+      a.dead = true;
+      addLog(`💀 ${a.name} DIED OF STARVATION`);
+      continue;
+    }
 
     // hungry + has money → seek trade
     if (a.hunger < 50 && a.cash >= 50) {
       let target = null;
       let bestDist = Infinity;
 
-      agents.forEach(b => {
-        if (b === a || b.food < 1) return;
+      for (let j = 0; j < agents.length; j++) {
+        const b = agents[j];
+        if (b === a || b.dead || b.food < 1) continue;
         const d = Math.hypot(a.x-b.x, a.y-b.y);
         if (d < a.visibility && d < bestDist) {
           bestDist = d;
           target = b;
         }
-      });
+      }
 
       if (target) {
         const dx = target.x - a.x;
@@ -155,21 +172,19 @@ function step() {
         a.vx += (dx/dist)*1.05;
         a.vy += (dy/dist)*1.05;
 
-        // trade when close
         if (dist < 32) {
           const price = 50;
           if (a.cash >= price && target.food >= 1) {
             target.food -= 1;
             a.cash -= price;
             target.cash += price;
-            // buyer immediately eats the food
             a.hunger = Math.min(100, a.hunger + 30);
             addLog(`${a.name} bought & ate 1 FOOD from ${target.name} for $${price}`);
           }
         }
       }
     }
-  });
+  }
 
   document.getElementById('tickDisp').textContent = `TICK: ${tick}`;
   draw();
@@ -188,16 +203,14 @@ function resetSim() {
   logs = [];
   agents = [];
   for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-  addLog('=== SIM RESET (cash enabled) ===');
-  addLog('Food price fixed at $50/unit • Cash required to trade');
+  addLog('=== SIM RESET (death enabled) ===');
   updateSidebar();
 }
 
 // START
 for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-addLog('=== PHASE 1 SIMPLE — CASH TRADING ACTIVE ===');
-addLog('Each agent starts with random cash 0-500');
-addLog('Hunger < 50 + $50 → seek trade (visibility shown)');
+addLog('=== PHASE 1 SIMPLE — DEATH ENABLED ===');
+addLog('Agents now die when hunger reaches 0');
 updateSidebar();
 setInterval(step, 32);
 draw();
