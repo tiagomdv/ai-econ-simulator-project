@@ -1,0 +1,16 @@
+# Project Objective
+
+This is my deliberate exposure project to the 2026 world of AI coding.
+
+Goal: Build a complete, working, well-architected app from scratch while acting purely as Project Manager and code reviewer.
+
+Rules I follow:
+- Use only AI tools (Grok, Claude, Gemini)
+- One feature at a time
+- Always test locally
+- Commit & push after every successful feature
+- Keep every chat fresh (new chat per major task to avoid context contamination)
+- Maintain full implementation log
+- Follow modern best practices (clean code, accessibility, mobile-first, localStorage persistence, etc.)
+
+Outcome: A real portfolio piece + deep understanding of how to lead AI development in 2026.
