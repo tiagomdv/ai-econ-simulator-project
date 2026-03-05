@@ -26,21 +26,19 @@ header { background:#0b0f15; border-bottom:1px solid #192130; padding:8px 16px; 
     <button onclick="resetSim()" class="btn">RESET</button>
     <span id="tickDisp" class="ml-auto font-mono">TICK: 0</span>
   </header>
-
   <div class="flex flex-1 overflow-hidden">
     <canvas id="canvas" width="940" height="700"></canvas>
-    
+   
     <!-- RIGHT PANEL -->
     <div id="sidebar">
       <div class="text-[#00e5ff] text-xs tracking-widest mb-3">// GLOBAL METRICS</div>
       <div id="global-metrics" class="mb-6 text-xs bg-[#11151f] p-3 rounded border border-[#1e2d3d]"></div>
-      
+     
       <div class="text-[#00e5ff] text-xs tracking-widest mb-4">// AGENTS + DNA</div>
       <div id="agent-list"></div>
     </div>
   </div>
 </div>
-
 <div id="log" class="log"></div>
 
 <script>
@@ -53,7 +51,7 @@ let running = true;
 let logs = [];
 let totalFoodConsumed = 0;
 
-// CREATE AGENT — now with first DNA trait
+// CREATE AGENT
 function createAgent(i) {
   return {
     id: i,
@@ -68,22 +66,21 @@ function createAgent(i) {
     hunger: 82,
     visibility: 165,
     dead: false,
-    // ── DNA START ──
     dna: {
-      hoardFoodBias: 0.3 + Math.random() * 0.65   // 0.3 = sells freely, 0.95 = extreme hoarder
+      hoardFoodBias: 0.3 + Math.random() * 0.65 // 0.3 = sells freely, 0.95 = extreme hoarder
     }
   };
 }
 
 function addLog(msg) {
   logs.unshift(`[${String(tick).padStart(4,'0')}] ${msg}`);
-  if (logs.length > 30) logs.pop();
+  if (logs.length > 35) logs.pop();
   document.getElementById('log').innerHTML = logs.map(l => `<div>${l}</div>`).join('');
 }
 
 function updateSidebar() {
   const totalFoodAvailable = agents.reduce((sum, a) => sum + (a.dead ? 0 : a.food), 0);
-  
+ 
   document.getElementById('global-metrics').innerHTML = `
     <div class="grid grid-cols-2 gap-3 text-xs">
       <div>FOOD CONSUMED</div><div class="text-emerald-400 font-bold">${totalFoodConsumed}</div>
@@ -94,8 +91,8 @@ function updateSidebar() {
   let html = '';
   agents.forEach(a => {
     const status = a.dead ? '<span class="text-red-400">DEAD</span>' : '';
-    const hColor = a.dead ? 'text-red-400' : (a.hunger < 50 ? 'text-red-400' : 'text-emerald-400');
-    const hoardColor = a.dna.hoardFoodBias > 0.7 ? 'text-red-400' : 'text-amber-300';
+    const hColor = a.dead ? 'text-red-400' : (a.hunger < 40 ? 'text-red-400' : 'text-emerald-400');
+    const hoardColor = a.dna.hoardFoodBias > 0.75 ? 'text-red-400' : 'text-amber-300';
     html += `
       <div class="agent-card ${a.dead ? 'dead' : ''}">
         <div style="color:${a.color}" class="font-bold">${a.name} ${status}</div>
@@ -114,7 +111,6 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   agents.forEach(a => {
     if (a.dead) return;
-
     ctx.beginPath();
     ctx.arc(a.x, a.y, a.visibility, 0, Math.PI*2);
     ctx.strokeStyle = 'rgba(0,229,255,0.13)';
@@ -147,21 +143,26 @@ function step() {
     a.vx += (Math.random()-0.5)*0.65;
     a.vy += (Math.random()-0.5)*0.65;
     const spd = Math.hypot(a.vx, a.vy);
-    if (spd > 2.3) { a.vx = (a.vx/spd)*2.3; a.vy = (a.vy/spd)*2.3; }
+    if (spd > 2.3) {
+      a.vx = (a.vx/spd)*2.3;
+      a.vy = (a.vy/spd)*2.3;
+    }
     a.x += a.vx;
     a.y += a.vy;
 
-    if (a.x < 30 || a.x > 910) a.vx *= -0.88;
-    if (a.y < 30 || a.y > 670) a.vy *= -0.88;
+    if (a.x < 30) { a.x = 30; a.vx *= -0.9; }
+    if (a.x > 910) { a.x = 910; a.vx *= -0.9; }
+    if (a.y < 30) { a.y = 30; a.vy *= -0.9; }
+    if (a.y > 670) { a.y = 670; a.vy *= -0.9; }
 
     if (tick % 10 === 0) a.hunger = Math.max(0, a.hunger - 1);
 
     // SELF CONSUMPTION
-    if (a.hunger <50 && a.food > 0) {
+    if (a.hunger < 45 && a.food > 0) {
       a.food -= 1;
       a.hunger = Math.min(100, a.hunger + 28);
       totalFoodConsumed++;
-      addLog(`${a.name} ate 1 own FOOD`);
+      addLog(`${a.name} ate own FOOD`);
     }
 
     // DEATH CHECK
@@ -171,11 +172,11 @@ function step() {
       continue;
     }
 
-    // DNA-DRIVEN TRADING (when meeting another agent)
-    if (a.hunger < 50 && a.food === 0 && a.cash >= 50) {
+    // ── DNA-DRIVEN BUYING (updated per PM request) ──
+    // High hoardFoodBias agents now buy at ANY hunger level to stockpile for future
+    if (a.cash >= 50) {
       let target = null;
       let bestDist = Infinity;
-
       for (let j = 0; j < agents.length; j++) {
         const b = agents[j];
         if (b === a || b.dead || b.food < 1) continue;
@@ -190,14 +191,15 @@ function step() {
         const dx = target.x - a.x;
         const dy = target.y - a.y;
         const dist = Math.hypot(dx, dy) || 1;
-        a.vx += (dx/dist)*1.05;
-        a.vy += (dy/dist)*1.05;
+        a.vx += (dx/dist)*1.1;
+        a.vy += (dy/dist)*1.1;
 
-        // DNA decision: buyer only buys if very hungry or low hoard bias
-        const buyerWants = a.hunger < 35 || a.dna.hoardFoodBias < 0.6;
-        
-        // Seller only sells if low hoard bias or desperate buyer
-        const sellerWantsToSell = target.dna.hoardFoodBias < 0.7 || a.hunger < 25;
+        const hoard = a.dna.hoardFoodBias;
+        const buyThreshold = 32 + (hoard * 63);           // low bias ~51, high bias ~92 → buys almost anytime
+        const minDesiredFood = 2 + Math.floor(hoard * 7); // hoarders keep bigger buffer
+
+        const buyerWants = (a.hunger < buyThreshold) || (a.food < minDesiredFood);
+        const sellerWantsToSell = target.dna.hoardFoodBias < 0.67 || a.hunger < 25;
 
         if (buyerWants && sellerWantsToSell) {
           const price = 50;
@@ -206,7 +208,8 @@ function step() {
             a.cash -= price;
             target.cash += price;
             a.hunger = Math.min(100, a.hunger + 30);
-            addLog(`${a.name} (hoard:${(a.dna.hoardFoodBias*100).toFixed(0)}%) bought & ate 1 FOOD from ${target.name} (hoard:${(target.dna.hoardFoodBias*100).toFixed(0)}%)`);
+            totalFoodConsumed++;
+            addLog(`${a.name} <span class="text-orange-400">[${(hoard*100).toFixed(0)}% hoard]</span> bought 1 FOOD from ${target.name}`);
           }
         }
       }
@@ -231,14 +234,14 @@ function resetSim() {
   totalFoodConsumed = 0;
   agents = [];
   for (let i = 0; i < 4; i++) agents.push(createAgent(i));
-  addLog('=== SIM RESET (DNA active) ===');
+  addLog('=== SIM RESET — Hoarding DNA Active ===');
   updateSidebar();
 }
 
 // START
 for (let i = 0; i < 4; i++) agents.push(createAgent(i));
 addLog('=== DNA HOARD BIAS ACTIVE ===');
-addLog('Agents now decide to buy/sell based on hoardFoodBias');
+addLog('High-hoard agents now buy at ANYTIME / ANY hunger to stockpile for future');
 updateSidebar();
 setInterval(step, 32);
 draw();
