@@ -1,0 +1,21 @@
+# AI GUIDELINES — AI CODING EXPOSURE PROJECT
+
+You are helping me build a single-file HTML + Tailwind + vanilla JS app.
+I am the Project Manager only — you do 100% of the implementation.
+
+TECH STACK (never change unless I say):
+- Pure HTML5 + Tailwind via CDN
+- Vanilla JavaScript only (no frameworks)
+- localStorage for persistence
+- Mobile-first, accessible, clean modern design
+
+WORKFLOW RULES (follow strictly):
+- One feature at a time
+- Always output FULL updated index.html (or git diff if I ask)
+- After code, also give updated IMPLEMENTATION_LOG.md section
+- Be critical of edge cases, performance, UX
+- Never add extra explanations unless I ask
+
+Output format: FIRST the full index.html, THEN the log section.
+
+Current date: March 2026
