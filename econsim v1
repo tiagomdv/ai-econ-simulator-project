@@ -67,7 +67,7 @@ function createAgent(i) {
     visibility: 165,
     dead: false,
     dna: {
-      hoardFoodBias: 0.3 + Math.random() * 0.65 // 0.3 = sells freely, 0.95 = extreme hoarder
+      hoardFoodBias: 0.3 + Math.random() * 0.65
     }
   };
 }
@@ -172,8 +172,7 @@ function step() {
       continue;
     }
 
-    // ── DNA-DRIVEN BUYING (updated per PM request) ──
-    // High hoardFoodBias agents now buy at ANY hunger level to stockpile for future
+    // ── DNA-DRIVEN BUYING + SELLING (fixed per PM flag) ──
     if (a.cash >= 50) {
       let target = null;
       let bestDist = Infinity;
@@ -195,11 +194,17 @@ function step() {
         a.vy += (dy/dist)*1.1;
 
         const hoard = a.dna.hoardFoodBias;
-        const buyThreshold = 32 + (hoard * 63);           // low bias ~51, high bias ~92 → buys almost anytime
-        const minDesiredFood = 2 + Math.floor(hoard * 7); // hoarders keep bigger buffer
+        const buyThreshold = 32 + (hoard * 63);
+        const minDesiredFood = 2 + Math.floor(hoard * 7);
 
         const buyerWants = (a.hunger < buyThreshold) || (a.food < minDesiredFood);
-        const sellerWantsToSell = target.dna.hoardFoodBias < 0.67 || a.hunger < 25;
+
+        // FIXED: seller now checks THEIR OWN hunger (target.hunger) — not buyer's
+        // Seller sells if: low hoard bias OR very desperate (hungry) OR buyer is starving
+        const sellerWantsToSell = 
+          target.dna.hoardFoodBias < 0.67 || 
+          target.hunger < 32 || 
+          a.hunger < 25;
 
         if (buyerWants && sellerWantsToSell) {
           const price = 50;
@@ -241,7 +246,7 @@ function resetSim() {
 // START
 for (let i = 0; i < 4; i++) agents.push(createAgent(i));
 addLog('=== DNA HOARD BIAS ACTIVE ===');
-addLog('High-hoard agents now buy at ANYTIME / ANY hunger to stockpile for future');
+addLog('Seller now correctly checks own hunger (fixed)');
 updateSidebar();
 setInterval(step, 32);
 draw();
