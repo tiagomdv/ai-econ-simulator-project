@@ -1,0 +1,29 @@
+# Future Features Backlog (Phase 2+)
+
+All the advanced mechanics from the original v5.0 will be added here, one at a time:
+
+### Phase 2 – Economy Depth
+- Multiple goods (TECH, CLOTH, LUXURY)
+- Factories + upgrades + retooling
+- Land claiming + rental system
+- Market prices driven by preferences
+
+### Phase 3 – Agents & Survival
+- Hunger / starvation / death
+- Role system (Wanderer, Owner, Producer, Landlord, Renter, Subsister)
+- Basic DNA traits (no evolution yet)
+- Foraging on idle land + drought mechanic
+
+### Phase 4 – Evolution & Stats
+- Generation system + extinction / next gen
+- DNA inheritance + mutation
+- Comprehensive stats popup (tabs, charts, reports)
+- Full save/load + export/import
+
+### Phase 5 – Polish & Advanced
+- Exploration / pathfinding
+- Interaction history between agents
+- Gini coefficient + wealth distribution graphs
+- Performance optimizations
+
+We will implement these one feature at a time after Phase 1 is solid.
